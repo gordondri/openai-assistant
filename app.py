@@ -1,5 +1,7 @@
 import os
 from io import BytesIO
+import base64
+import httpx
 from pathlib import Path
 from typing import List
 
@@ -9,7 +11,7 @@ from literalai.helper import utc_now
 
 import chainlit as cl
 from chainlit.config import config
-from chainlit.element import Element
+from chainlit.element import Element, ElementBased
 
 
 async_openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -18,6 +20,12 @@ sync_openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 assistant = sync_openai_client.beta.assistants.retrieve(
     os.environ.get("OPENAI_ASSISTANT_ID")
 )
+
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID")
+
+if not ELEVENLABS_API_KEY or not ELEVENLABS_VOICE_ID:
+    raise ValueError("ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID must be set")
 
 config.ui.name = assistant.name
 
@@ -91,8 +99,12 @@ class EventHandler(AsyncAssistantEventHandler):
         self.current_message.elements.append(image_element)
         await self.current_message.update()
 
+# Function to encode an image
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
 
-@cl.step(type="tool")
+# @cl.step(type="tool")
 async def speech_to_text(audio_file):
     response = await async_openai_client.audio.transcriptions.create(
         model="whisper-1", file=audio_file
@@ -100,6 +112,72 @@ async def speech_to_text(audio_file):
 
     return response.text
 
+# @cl.step(type="tool")
+async def generate_text_answer(transcription, images):
+    if images:
+        # Only process the first 3 images
+        images = images[:3]
+
+        images_content = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image.mime};base64,{encode_image(image.path)}"
+                },
+            }
+            for image in images
+        ]
+
+        model = "gpt-4-turbo"
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": transcription}, *images_content],
+            }
+        ]
+    else:
+        model = "gpt-4o"
+        messages = [{"role": "user", "content": transcription}]
+
+    response = await async_openai_client.chat.completions.create(
+        messages=messages, model=model, temperature=0.3
+    )
+
+    return response.choices[0].message.content
+
+# @cl.step(type="tool")
+async def text_to_speech(text: str, mime_type: str):
+    CHUNK_SIZE = 1024
+
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+    headers = {
+    "Accept": mime_type,
+    "Content-Type": "application/json",
+    "xi-api-key": ELEVENLABS_API_KEY
+    }
+
+    data = {
+        "text": text,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.5
+        }
+    }
+    
+    async with httpx.AsyncClient(timeout=250.0) as client:
+        response = await client.post(url, json=data, headers=headers)
+        response.raise_for_status()  # Ensure we notice bad responses
+
+        buffer = BytesIO()
+        buffer.name = f"output_audio.{mime_type.split('/')[1]}"
+
+        async for chunk in response.aiter_bytes(chunk_size=CHUNK_SIZE):
+            if chunk:
+                buffer.write(chunk)
+        
+        buffer.seek(0)
+        return buffer.name, buffer.read()
 
 async def upload_files(files: List[Element]):
     file_ids = []
@@ -132,10 +210,23 @@ async def start_chat():
     thread = await async_openai_client.beta.threads.create()
     # Store thread ID in user session for later use
     cl.user_session.set("thread_id", thread.id)
+    await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiner!").send()
     intro = (
-        "Hello, I'm the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
+        "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
         "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are:\n\n"
     )
+    output_name, output_audio = await text_to_speech(f"{intro}", "audio/webm")
+    output_audio_el = cl.Audio(
+        name=output_name,
+        mime="audio/webm",
+        auto_play=True,
+        content=output_audio,
+    )
+    answer_message = await cl.Message(content="").send()
+    
+    answer_message.elements = [output_audio_el]
+    await answer_message.update()
+    
     questions = (
     "1. What is the purpose of the disability “freeze” and how does it affect retirement and survivor benefits?\n\n"
     "2. What are the key differences between the Title II and Title XVI disability programs, especially regarding funding and work criteria?\n\n"
@@ -143,11 +234,11 @@ async def start_chat():
     "4. What are the primary responsibilities of a Disability Examiner (DE) in the disability determination process?\n\n"
     "5. Can you explain the sequential evaluation process for determining disability for adults?"
     )
-    await cl.Message(content=f"{intro} {questions}").send()
+    await cl.Message(content=f"{questions}").send()
     
 
 @cl.on_message
-async def main(message: cl.Message):
+async def main(message: cl.Message, audio_mime_type: str = None):
     thread_id = cl.user_session.get("thread_id")
 
     attachments = await process_files(message.elements)
@@ -167,6 +258,21 @@ async def main(message: cl.Message):
         event_handler=EventHandler(assistant_name=assistant.name),
     ) as stream:
         await stream.until_done()
+    
+    # Synthesize audio from the last message
+    output_name, output_audio = await text_to_speech(stream.current_message.content, audio_mime_type)
+    
+    output_audio_el = cl.Audio(
+        name=output_name,
+        auto_play=True,
+        mime=audio_mime_type,
+        content=output_audio,
+    )
+    
+    answer_message = await cl.Message(content="").send()
+
+    answer_message.elements = [output_audio_el]
+    await answer_message.update()
 
 
 @cl.on_audio_chunk
@@ -184,7 +290,7 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
 
 
 @cl.on_audio_end
-async def on_audio_end(elements: list[Element]):
+async def on_audio_end(elements: list[ElementBased]):
     # Get the audio buffer from the session
     audio_buffer: BytesIO = cl.user_session.get("audio_buffer")
     audio_buffer.seek(0)  # Move the file pointer to the beginning
@@ -206,4 +312,4 @@ async def on_audio_end(elements: list[Element]):
 
     msg = cl.Message(author="You", content=transcription, elements=elements)
 
-    await main(message=msg)
+    await main(message=msg, audio_mime_type=audio_mime_type)
