@@ -210,7 +210,7 @@ async def start_chat():
     thread = await async_openai_client.beta.threads.create()
     # Store thread ID in user session for later use
     cl.user_session.set("thread_id", thread.id)
-    await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiner!").send()
+    await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiners!").send()
     intro = (
         "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
         "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are:\n\n"
