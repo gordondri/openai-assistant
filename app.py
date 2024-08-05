@@ -268,6 +268,9 @@ async def main(message: cl.Message, audio_mime_type: str = None):
         event_handler=EventHandler(assistant_name=assistant.name),
     ) as stream:
         await stream.until_done()
+        
+    # remove all special characters from the message
+    message.content = ''.join(e for e in message.content if e.isalnum())
     
     # Synthesize audio from the last message
     output_name, output_audio = await text_to_speech(stream.current_message.content, audio_mime_type)
