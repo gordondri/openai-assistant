@@ -170,8 +170,6 @@ async def text_to_speech(text: str, mime_type: str):
     }
     
     async with httpx.AsyncClient(timeout=250.0) as client:
-        print("Headers:", headers)
-        print("Data:", data)
         response = await client.post(url, json=data, headers=headers)
         response.raise_for_status()  # Ensure we notice bad responses
 
@@ -209,38 +207,53 @@ async def process_files(files: List[Element]):
         for file_id in file_ids
     ]
 
-
 @cl.on_chat_start
 async def start_chat():
     # Create a Thread
     thread = await async_openai_client.beta.threads.create()
     # Store thread ID in user session for later use
     cl.user_session.set("thread_id", thread.id)
-    await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiners!").send()
-    intro = (
-        "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
-        "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are included below:\n\n"
-    )
-    output_name, output_audio = await text_to_speech(f"{intro}", "audio/webm")
-    output_audio_el = cl.Audio(
-        name=output_name,
-        mime="audio/webm",
-        auto_play=True,
-        content=output_audio,
-    )
-    answer_message = await cl.Message(content="").send()
     
-    answer_message.elements = [output_audio_el]
-    await answer_message.update()
+@cl.set_starters
+async def set_starters():
     
-    questions = (
-    "1. What is the purpose of the disability “freeze” and how does it affect retirement and survivor benefits?\n\n"
-    "2. What are the key differences between the Title II and Title XVI disability programs, especially regarding funding and work criteria?\n\n"
-    "3. What is the process for translating laws into POMS instructions, and how do these instructions guide disability adjudication?\n\n"
-    "4. What are the primary responsibilities of a Disability Examiner (DE) in the disability determination process?\n\n"
-    "5. Can you explain the sequential evaluation process for determining disability for adults?"
-    )
-    await cl.Message(content=f"{questions}").send()
+    # await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiners!").send()
+    # intro = (
+    #     "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
+    #     "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are included below:\n\n"
+    # )
+    # output_name, output_audio = await text_to_speech(f"{intro}", "audio/webm")
+    # output_audio_el = cl.Audio(
+    #     name=output_name,
+    #     mime="audio/webm",
+    #     auto_play=True,
+    #     content=output_audio,
+    # )
+    # answer_message = await cl.Message(content="").send()
+    
+    # answer_message.elements = [output_audio_el]
+    # await answer_message.update()
+    
+    return [
+        cl.Starter(
+            label="Title II vs Title XVI",
+            message="What are the key differences between the Title II and Title XVI disability programs, especially regarding funding and work criteria?",
+            icon="/public/write.svg",
+        ),
+        cl.Starter(
+            label="Responsibilities of a Disability Examiner",
+            message="What are the primary responsibilities of a Disability Examiner (DE) in the disability determination process?",
+            icon="/public/write.svg",
+        ),
+
+        cl.Starter(
+            label="Sequential evaluation process",
+            message="Can you explain the sequential evaluation process for determining disability for adults?",
+            icon="/public/write.svg",
+        )
+    ]
+    
+    
     
 @cl.password_auth_callback
 def auth_callback(username: str, password: str):
