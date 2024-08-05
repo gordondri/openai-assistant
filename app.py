@@ -149,9 +149,6 @@ async def speech_to_text(audio_file):
 @cl.step(type="tool")
 async def text_to_speech(text: str, mime_type: str):
     CHUNK_SIZE = 1024
-    
-    if mime_type is None:
-        mime_type = "audio/mp3"
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
     headers = {
@@ -267,7 +264,7 @@ def auth_callback(username: str, password: str):
         return None
 
 @cl.on_message
-async def main(message: cl.Message, audio_mime_type: str = None):
+async def main(message: cl.Message, audio_mime_type: str = "audio/wav"):
     thread_id = cl.user_session.get("thread_id")
 
     attachments = await process_files(message.elements)
@@ -288,17 +285,6 @@ async def main(message: cl.Message, audio_mime_type: str = None):
     ) as stream:
         await stream.until_done()
         
-    # remove all markdown characters from the message
-    # import re
-    # def clean_markdown(text):
-    #     # Define the characters to remove
-    #     markdown_chars = r'[*_`~#>+={}$begin:math:display$$end:math:display$\\|-]'
-        
-    #     # Use regex to replace the characters with an empty string
-    #     cleaned_text = re.sub(markdown_chars, '', text)
-        
-    #     return cleaned_text
-    
     def clean_content(text):
         return text.replace('*', '').replace('#', '')
     stream.current_message.content = clean_content(stream.current_message.content)
@@ -325,13 +311,17 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
     if chunk.isStart:
         buffer = BytesIO()
         # This is required for whisper to recognize the file type
+        if chunk.mimeType != "audio/wav":
+            chunk.mimeType = "audio/wav"
         buffer.name = f"input_audio.{chunk.mimeType.split('/')[1]}"
         # Initialize the session for a new audio stream
         cl.user_session.set("audio_buffer", buffer)
-        # cl.user_session.set("audio_mime_type", chunk.mimeType)
-        cl.user_session.set("audio_mime_type", "audio/mp3")
+        cl.user_session.set("audio_mime_type", "audio/wav")
 
-    # Write the chunks to a buffer and transcribe the whole audio at the end
+    # TODO: Use Gladia to transcribe chunks as they arrive would decrease latency
+    # see https://docs-v1.gladia.io/reference/live-audio
+    
+    # For now, write the chunks to a buffer and transcribe the whole audio at the end
     cl.user_session.get("audio_buffer").write(chunk.data)
 
 
@@ -339,18 +329,9 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
 async def on_audio_end(elements: list[ElementBased]):
     # Get the audio buffer from the session
     audio_buffer: BytesIO = cl.user_session.get("audio_buffer")
-    
-    if audio_buffer is None:
-        # Handle the case where the audio buffer is None
-        await cl.Message(content="Please try again.").send()
-        return
-    
     audio_buffer.seek(0)  # Move the file pointer to the beginning
     audio_file = audio_buffer.read()
     audio_mime_type: str = cl.user_session.get("audio_mime_type")
-    
-    if audio_mime_type is None or audio_mime_type == "audio/webm":
-        audio_mime_type = "audio/mp3"
 
     print(f"Using mime type {audio_mime_type} for input audio")
     input_audio_el = cl.Audio(
