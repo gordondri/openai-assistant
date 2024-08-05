@@ -132,8 +132,18 @@ async def start_chat():
     thread = await async_openai_client.beta.threads.create()
     # Store thread ID in user session for later use
     cl.user_session.set("thread_id", thread.id)
-    await cl.Avatar(name=assistant.name, path="./public/logo.png").send()
-    await cl.Message(content=f"Hello, I'm {assistant.name}!", disable_feedback=True).send()
+    intro = (
+        "Hello, I'm the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
+        "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are:\n\n"
+    )
+    questions = (
+    "1. What is the purpose of the disability “freeze” and how does it affect retirement and survivor benefits?\n\n"
+    "2. What are the key differences between the Title II and Title XVI disability programs, especially regarding funding and work criteria?\n\n"
+    "3. What is the process for translating laws into POMS instructions, and how do these instructions guide disability adjudication?\n\n"
+    "4. What are the primary responsibilities of a Disability Examiner (DE) in the disability determination process?\n\n"
+    "5. Can you explain the sequential evaluation process for determining disability for adults?"
+    )
+    await cl.Message(content=f"{intro} {questions}").send()
     
 
 @cl.on_message
