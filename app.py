@@ -148,6 +148,9 @@ async def speech_to_text(audio_file):
 @cl.step(type="tool")
 async def text_to_speech(text: str, mime_type: str):
     CHUNK_SIZE = 1024
+    
+    if mime_type is None:
+        mime_type = "audio/webm"
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
     headers = {
@@ -166,6 +169,8 @@ async def text_to_speech(text: str, mime_type: str):
     }
     
     async with httpx.AsyncClient(timeout=250.0) as client:
+        print("Headers:", headers)
+        print("Data:", data)
         response = await client.post(url, json=data, headers=headers)
         response.raise_for_status()  # Ensure we notice bad responses
 

@@ -12,6 +12,10 @@ services:
         sync: false
       - key: LITERAL_API_KEY
         sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
     region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: chainlit run app.py -h --port $PORT
