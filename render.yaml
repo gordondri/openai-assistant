@@ -1,9 +1,9 @@
 # Exported from Render on 2024-05-20T20:56:35Z
 services:
   - type: web
-    name: Chainlit-OpenAI-Assistant
+    name: Arkansis-DDS-Assistant
     runtime: python
-    repo: https://github.com/Chainlit/openai-assistant
+    repo: https://github.com/gordondri/openai-assistant
     plan: starter
     envVars:
       - key: OPENAI_API_KEY
@@ -12,7 +12,7 @@ services:
         sync: false
       - key: LITERAL_API_KEY
         sync: false
-    region: frankfurt
+    region: us-west
     buildCommand: pip install -r requirements.txt
     startCommand: chainlit run app.py -h --port $PORT
 version: "1"
