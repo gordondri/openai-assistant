@@ -1,7 +1,7 @@
 # Exported from Render on 2024-05-20T20:56:35Z
 services:
   - type: web
-    name: Arkansis-DDS-Assistant
+    name: Arkansas-DDS-Assistant
     runtime: python
     repo: https://github.com/gordondri/openai-assistant
     plan: starter
