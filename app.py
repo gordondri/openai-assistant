@@ -299,10 +299,10 @@ async def main(message: cl.Message, audio_mime_type: str = None):
         
     #     return cleaned_text
     
-    def remove_asterisks(text):
-        return text.replace('*', '')
+    def clean_content(text):
+        return text.replace('*', '').replace('#', '')
     print(f"Before cleaning: {stream.current_message.content}")
-    stream.current_message.content = remove_asterisks(stream.current_message.content)
+    stream.current_message.content = clean_content(stream.current_message.content)
     print(f"After cleaning: {stream.current_message.content}")
     
     # Synthesize audio from the last message
