@@ -104,7 +104,7 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-# @cl.step(type="tool")
+@cl.step(type="tool")
 async def speech_to_text(audio_file):
     response = await async_openai_client.audio.transcriptions.create(
         model="whisper-1", file=audio_file
@@ -113,39 +113,39 @@ async def speech_to_text(audio_file):
     return response.text
 
 # @cl.step(type="tool")
-async def generate_text_answer(transcription, images):
-    if images:
-        # Only process the first 3 images
-        images = images[:3]
+# async def generate_text_answer(transcription, images):
+#     if images:
+#         # Only process the first 3 images
+#         images = images[:3]
 
-        images_content = [
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{image.mime};base64,{encode_image(image.path)}"
-                },
-            }
-            for image in images
-        ]
+#         images_content = [
+#             {
+#                 "type": "image_url",
+#                 "image_url": {
+#                     "url": f"data:{image.mime};base64,{encode_image(image.path)}"
+#                 },
+#             }
+#             for image in images
+#         ]
 
-        model = "gpt-4-turbo"
-        messages = [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": transcription}, *images_content],
-            }
-        ]
-    else:
-        model = "gpt-4o"
-        messages = [{"role": "user", "content": transcription}]
+#         model = "gpt-4-turbo"
+#         messages = [
+#             {
+#                 "role": "user",
+#                 "content": [{"type": "text", "text": transcription}, *images_content],
+#             }
+#         ]
+#     else:
+#         model = "gpt-4o"
+#         messages = [{"role": "user", "content": transcription}]
 
-    response = await async_openai_client.chat.completions.create(
-        messages=messages, model=model, temperature=0.3
-    )
+#     response = await async_openai_client.chat.completions.create(
+#         messages=messages, model=model, temperature=0.3
+#     )
 
-    return response.choices[0].message.content
+#     return response.choices[0].message.content
 
-# @cl.step(type="tool")
+@cl.step(type="tool")
 async def text_to_speech(text: str, mime_type: str):
     CHUNK_SIZE = 1024
 
@@ -236,6 +236,16 @@ async def start_chat():
     )
     await cl.Message(content=f"{questions}").send()
     
+@cl.password_auth_callback
+def auth_callback(username: str, password: str):
+    # Fetch the user matching username from your database
+    # and compare the hashed password with the value stored in the database
+    if (username, password) == ("dds", "arkansas"):
+        return cl.User(
+            identifier="admin", metadata={"role": "admin", "provider": "credentials"}
+        )
+    else:
+        return None
 
 @cl.on_message
 async def main(message: cl.Message, audio_mime_type: str = None):
@@ -298,7 +308,9 @@ async def on_audio_end(elements: list[ElementBased]):
     audio_mime_type: str = cl.user_session.get("audio_mime_type")
 
     input_audio_el = cl.Audio(
-        mime=audio_mime_type, content=audio_file, name=audio_buffer.name
+        mime=audio_mime_type, 
+        content=audio_file, 
+        name=audio_buffer.name
     )
     await cl.Message(
         author="You",
