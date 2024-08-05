@@ -301,9 +301,7 @@ async def main(message: cl.Message, audio_mime_type: str = None):
     
     def clean_content(text):
         return text.replace('*', '').replace('#', '')
-    print(f"Before cleaning: {stream.current_message.content}")
     stream.current_message.content = clean_content(stream.current_message.content)
-    print(f"After cleaning: {stream.current_message.content}")
     
     # Synthesize audio from the last message
     output_name, output_audio = await text_to_speech(stream.current_message.content, audio_mime_type)
