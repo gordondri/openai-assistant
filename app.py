@@ -341,9 +341,10 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
 async def on_audio_end(elements: list[ElementBased]):
     # Get the audio buffer from the session
     audio_buffer: BytesIO = cl.user_session.get("audio_buffer")
-    audio_buffer.seek(0)  # Move the file pointer to the beginning
-    audio_file = audio_buffer.read()
-    audio_mime_type: str = cl.user_session.get("audio_mime_type")
+    if audio_buffer is not None:
+        audio_buffer.seek(0)  # Move the file pointer to the beginning
+        audio_file = audio_buffer.read()
+        audio_mime_type: str = cl.user_session.get("audio_mime_type")
     
     if audio_mime_type is None or audio_mime_type == "audio/webm":
         audio_mime_type = "audio/mp3"
