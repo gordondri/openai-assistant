@@ -151,7 +151,7 @@ async def text_to_speech(text: str, mime_type: str):
     CHUNK_SIZE = 1024
     
     if mime_type is None:
-        mime_type = "audio/webm"
+        mime_type = "audio/mp3"
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
     headers = {
@@ -288,12 +288,27 @@ async def main(message: cl.Message, audio_mime_type: str = None):
     ) as stream:
         await stream.until_done()
         
-    # remove all special characters from the message
-    message.content = ''.join(e for e in message.content if e.isalnum())
+    # remove all markdown characters from the message
+    # import re
+    # def clean_markdown(text):
+    #     # Define the characters to remove
+    #     markdown_chars = r'[*_`~#>+={}$begin:math:display$$end:math:display$\\|-]'
+        
+    #     # Use regex to replace the characters with an empty string
+    #     cleaned_text = re.sub(markdown_chars, '', text)
+        
+    #     return cleaned_text
+    
+    def remove_asterisks(text):
+        return text.replace('*', '')
+    print(f"Before cleaning: {stream.current_message.content}")
+    stream.current_message.content = remove_asterisks(stream.current_message.content)
+    print(f"After cleaning: {stream.current_message.content}")
     
     # Synthesize audio from the last message
     output_name, output_audio = await text_to_speech(stream.current_message.content, audio_mime_type)
     
+    print(f"Using mime type {audio_mime_type} for output audio")
     output_audio_el = cl.Audio(
         name=output_name,
         auto_play=True,
@@ -315,7 +330,8 @@ async def on_audio_chunk(chunk: cl.AudioChunk):
         buffer.name = f"input_audio.{chunk.mimeType.split('/')[1]}"
         # Initialize the session for a new audio stream
         cl.user_session.set("audio_buffer", buffer)
-        cl.user_session.set("audio_mime_type", chunk.mimeType)
+        # cl.user_session.set("audio_mime_type", chunk.mimeType)
+        cl.user_session.set("audio_mime_type", "audio/mp3")
 
     # Write the chunks to a buffer and transcribe the whole audio at the end
     cl.user_session.get("audio_buffer").write(chunk.data)
@@ -328,7 +344,11 @@ async def on_audio_end(elements: list[ElementBased]):
     audio_buffer.seek(0)  # Move the file pointer to the beginning
     audio_file = audio_buffer.read()
     audio_mime_type: str = cl.user_session.get("audio_mime_type")
+    
+    if audio_mime_type is None or audio_mime_type == "audio/webm":
+        audio_mime_type = "audio/mp3"
 
+    print(f"Using mime type {audio_mime_type} for input audio")
     input_audio_el = cl.Audio(
         mime=audio_mime_type, 
         content=audio_file, 
