@@ -28,6 +28,7 @@ if not ELEVENLABS_API_KEY or not ELEVENLABS_VOICE_ID:
     raise ValueError("ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID must be set")
 
 config.ui.name = assistant.name
+config.ui.theme.light
 
 class EventHandler(AsyncAssistantEventHandler):
 
@@ -218,7 +219,7 @@ async def start_chat():
     await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiners!").send()
     intro = (
         "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
-        "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are:\n\n"
+        "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are included below:\n\n"
     )
     output_name, output_audio = await text_to_speech(f"{intro}", "audio/webm")
     output_audio_el = cl.Audio(
