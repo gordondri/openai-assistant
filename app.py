@@ -28,7 +28,7 @@ if not ELEVENLABS_API_KEY or not ELEVENLABS_VOICE_ID:
     raise ValueError("ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID must be set")
 
 config.ui.name = assistant.name
-config.ui.theme.light
+config.ui.theme.default = "light"
 
 class EventHandler(AsyncAssistantEventHandler):
 
