@@ -240,7 +240,7 @@ async def start_chat():
 def auth_callback(username: str, password: str):
     # Fetch the user matching username from your database
     # and compare the hashed password with the value stored in the database
-    if (username, password) == ("dds", "arkansas"):
+    if (username, password) == ("dds", "Advocate4SSA"):
         return cl.User(
             identifier="admin", metadata={"role": "admin", "provider": "credentials"}
         )
