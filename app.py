@@ -4,6 +4,7 @@ import base64
 import httpx
 from pathlib import Path
 from typing import List
+import re
 
 from openai import AsyncAssistantEventHandler, AsyncOpenAI, OpenAI
 
@@ -30,6 +31,15 @@ if not ELEVENLABS_API_KEY or not ELEVENLABS_VOICE_ID:
 config.ui.name = assistant.name
 config.ui.theme.default = "light"
 
+def clean_content(text):
+    if not isinstance(text, str):
+        text = str(text)
+    # Define the regex pattern to match text within 【 and 】
+    pattern = r'【.*?†source】'
+    # Use re.sub to replace the matched patterns with an empty string
+    text = re.sub(pattern, '', text)
+    return text
+
 class EventHandler(AsyncAssistantEventHandler):
 
     def __init__(self, assistant_name: str) -> None:
@@ -43,7 +53,8 @@ class EventHandler(AsyncAssistantEventHandler):
         self.current_message = await cl.Message(author=self.assistant_name, content="").send()
 
     async def on_text_delta(self, delta, snapshot):
-        await self.current_message.stream_token(delta.value)
+        cleaned_text = clean_content(delta.value)
+        await self.current_message.stream_token(cleaned_text)
 
     async def on_text_done(self, text):
         await self.current_message.update()
@@ -113,39 +124,6 @@ async def speech_to_text(audio_file):
 
     return response.text
 
-# @cl.step(type="tool")
-# async def generate_text_answer(transcription, images):
-#     if images:
-#         # Only process the first 3 images
-#         images = images[:3]
-
-#         images_content = [
-#             {
-#                 "type": "image_url",
-#                 "image_url": {
-#                     "url": f"data:{image.mime};base64,{encode_image(image.path)}"
-#                 },
-#             }
-#             for image in images
-#         ]
-
-#         model = "gpt-4-turbo"
-#         messages = [
-#             {
-#                 "role": "user",
-#                 "content": [{"type": "text", "text": transcription}, *images_content],
-#             }
-#         ]
-#     else:
-#         model = "gpt-4o"
-#         messages = [{"role": "user", "content": transcription}]
-
-#     response = await async_openai_client.chat.completions.create(
-#         messages=messages, model=model, temperature=0.3
-#     )
-
-#     return response.choices[0].message.content
-
 @cl.step(type="tool")
 async def text_to_speech(text: str, mime_type: str):
     CHUNK_SIZE = 1024
@@ -213,24 +191,6 @@ async def start_chat():
     
 @cl.set_starters
 async def set_starters():
-    
-    # await cl.Message(content="Hello, Arkansas' newest batch of Disability Examiners!").send()
-    # intro = (
-    #     "I am the AI Assistant to Alex Watkins, Assistant Program Director of Training and Medical Liaison!\n\n"
-    #     "You can ask me questions to help you get through the Disability Examiner Basic Training Program. Examples of questions are included below:\n\n"
-    # )
-    # output_name, output_audio = await text_to_speech(f"{intro}", "audio/webm")
-    # output_audio_el = cl.Audio(
-    #     name=output_name,
-    #     mime="audio/webm",
-    #     auto_play=True,
-    #     content=output_audio,
-    # )
-    # answer_message = await cl.Message(content="").send()
-    
-    # answer_message.elements = [output_audio_el]
-    # await answer_message.update()
-    
     return [
         cl.Starter(
             label="Title II vs Title XVI",
@@ -249,8 +209,6 @@ async def set_starters():
             icon="/public/write.svg",
         )
     ]
-    
-    
     
 @cl.password_auth_callback
 def auth_callback(username: str, password: str):
@@ -276,7 +234,7 @@ async def main(message: cl.Message, audio_mime_type: str = "audio/wav"):
         content=message.content,
         attachments=attachments,
     )
-
+    
     # Create and Stream a Run
     async with async_openai_client.beta.threads.runs.stream(
         thread_id=thread_id,
@@ -284,11 +242,9 @@ async def main(message: cl.Message, audio_mime_type: str = "audio/wav"):
         event_handler=EventHandler(assistant_name=assistant.name),
     ) as stream:
         await stream.until_done()
-        
-    def clean_content(text):
-        return text.replace('*', '').replace('#', '')
-    stream.current_message.content = clean_content(stream.current_message.content)
     
+     # Replace asterisks and hash symbols
+    stream.current_message.content = stream.current_message.content.replace('*', '').replace('#', '')
     # Synthesize audio from the last message
     output_name, output_audio = await text_to_speech(stream.current_message.content, audio_mime_type)
     
